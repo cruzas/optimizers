@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=84.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "og-optimizers"
+version = "0.1.0"
+description = "A collection of classical optimization algorithms implemented in Python."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = ["numpy>=2.1.0", "scipy>=1.14.0", "matplotlib>=3.10.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "pytest-cov>=5.0.0", "ruff>=0.5.0", "mypy>=1.10.0"]
+
+[tool.ruff]
+line-length = 79 # PEP-8 recommends 79 characters for code and 72 for docstrings/comments
+target-version = "py314"
+
+[tool.ruff.lint]
+# E (pycodestyle errors): Checks standard PEP-8 style violations, such as identation, line length, white space, and formatting issues.
+# F (Pyflakes): Detects logical errors, such as undefined variables, unused imports, duplicate dictionary keys, or variable shadowing.
+# I (isort): Enforces alphabetical sorting and sectional grouping of import statements.
+# UP (pyupgrade): Automatically upgrades syntax to modern Python versions.
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers -ra"
+
