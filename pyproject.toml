@@ -8,6 +8,11 @@ version = "0.1.0"
 description = "A collection of classical optimization algorithms implemented in Python."
 readme = "README.md"
 requires-python = ">=3.14"
+# SPDX expression (PEP 639). The LICENSE file alone is not enough: without
+# this, installed metadata carries no License field and the shields.io
+# licence badge has nothing authoritative to read.
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = ["numpy>=2.1.0", "scipy>=1.14.0", "matplotlib>=3.10.5"]
 
 [project.optional-dependencies]

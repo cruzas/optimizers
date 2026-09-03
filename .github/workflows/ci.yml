@@ -126,6 +126,33 @@ jobs:
       # into the log, so a coverage drop is actionable without downloading
       # anything. --cov-fail-under makes coverage a gate rather than a
       # metric: the suite currently sits at 98%, so 90 leaves room for an
-      # honest refactor while still blocking a real regression.
+      # honest refactor while still blocking a real regression. Note that
+      # this gate is hermetic -- it passes or fails without contacting
+      # anyone, so the build never depends on Codecov being reachable.
+      # --cov-report=xml writes coverage.xml, which is what Codecov reads.
       - name: Run tests
-        run: pytest --cov=og_optimizers --cov-report=term-missing --cov-fail-under=90
+        run: >-
+          pytest
+          --cov=og_optimizers
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=90
+
+      # Upload from the Linux cell only. Codecov can merge reports from
+      # several jobs, but it then waits for all of them before finalising a
+      # commit, which makes the PR check slower and flakier for no gain
+      # here: this is pure-Python code whose covered lines do not vary by
+      # platform. Revisit if platform-specific branches ever appear.
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          # Public repos can upload without a token, but those uploads are
+          # rate-limited and fail unpredictably. A repository secret is the
+          # reliable path -- see the setup note in the README.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # Surface a broken token or malformed report as a red build
+          # rather than a badge that quietly says "unknown". Flip to false
+          # if Codecov outages ever become more annoying than informative.
+          fail_ci_if_error: true

@@ -1,0 +1,31 @@
+# Codecov configuration
+#
+# Keeps Codecov's pull-request checks aligned with the --cov-fail-under=90
+# gate in ci.yml. Without this, Codecov applies its own defaults and you
+# get two coverage checks disagreeing about what "passing" means.
+
+coverage:
+  status:
+    # Coverage of the project as a whole.
+    project:
+      default:
+        target: 90%
+        # Tolerate a 1% dip. Small refactors move the percentage slightly
+        # without making the suite genuinely weaker, and a check that
+        # cries wolf gets ignored.
+        threshold: 1%
+
+    # Coverage of the lines changed by the pull request. This is the more
+    # useful of the two: a project already at 98% can absorb a completely
+    # untested new function without the project number moving much, and
+    # this check is what catches that.
+    patch:
+      default:
+        target: 90%
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, flags, files"
+  # Do not post a comment when coverage is unchanged; an unread bot comment
+  # on every pull request trains you to ignore all of them.
+  require_changes: true
