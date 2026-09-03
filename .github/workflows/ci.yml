@@ -1,0 +1,131 @@
+# Continuous Integration
+#
+# Runs the same quality gates on every push and pull request that you would
+# run locally, but on clean, disposable machines. This is what makes the
+# green check mark on a pull request meaningful: it proves the code builds
+# and passes from a fresh checkout, not just on the author's laptop.
+
+name: CI # Shown in the GitHub Actions UI and in the README badge.
+
+on:
+  push:
+    branches: [main] # Guard the branch that must always be releasable.
+  pull_request:
+    branches: [main] # Catch breakage before it is merged, not after.
+  workflow_dispatch: # Adds a "Run workflow" button for manual re-runs.
+
+# A workflow gets a token to talk to the GitHub API. Grant the minimum it
+# needs. CI only reads the repository, so nothing here can push commits,
+# publish packages, or comment on issues even if a dependency is compromised.
+permissions:
+  contents: read
+
+# If you push twice in quick succession, cancel the older run. Only the tip
+# of the branch matters, and this keeps queue times (and billed minutes) down.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Single source of truth for the version used by the non-matrix jobs, so
+  # lint and typecheck cannot silently drift apart.
+  DEFAULT_PYTHON: "3.14"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Style and static correctness. Split into their own jobs so the pull
+  # request shows three named checks that fail independently: a formatting
+  # nit and a broken algorithm are different problems and should read that
+  # way. They also run in parallel, so total wall-clock time is unchanged.
+  # ---------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest # Linting is platform-independent; one runner is enough.
+    steps:
+      - uses: actions/checkout@v5 # Clones the repo into the runner. Nothing works without it.
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+          cache: pip # Restores the pip download cache between runs.
+          cache-dependency-path: pyproject.toml # Cache key: re-download only when deps change.
+
+      # Only the dev extra is needed: ruff never imports your code, so
+      # installing numpy/scipy/matplotlib here would be wasted minutes.
+      - name: Install linters
+        run: python -m pip install --upgrade pip ruff
+
+      # `check` finds bugs and style violations (the E/F/I/UP rules in
+      # pyproject.toml). `--output-format=github` makes failures appear as
+      # inline annotations on the diff instead of buried in a log.
+      - name: Ruff lint
+        run: ruff check --output-format=github .
+
+      # `format --check` fails instead of rewriting files, so CI reports
+      # formatting drift rather than silently disagreeing with your editor.
+      - name: Ruff format
+        run: ruff format --check --diff .
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.DEFAULT_PYTHON }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # mypy resolves the numpy/scipy type stubs, so unlike ruff it does
+      # need the real dependencies installed.
+      - name: Install package and dev dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      # strict = true in pyproject.toml, so this rejects untyped defs and
+      # implicit Any. Type-checking the tests too keeps fixtures honest.
+      - name: Mypy
+        run: mypy src tests
+
+  # ---------------------------------------------------------------------
+  # The test suite, run on every OS you claim to support. For numerical
+  # code this matters more than usual: BLAS backends, long-double width and
+  # float formatting genuinely differ across platforms, and a tolerance that
+  # holds on macOS can fail on Windows.
+  # ---------------------------------------------------------------------
+  test:
+    name: Test (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Do not cancel the whole matrix when one cell fails. You want to know
+      # whether it is "broken everywhere" or "broken only on Windows".
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # requires-python = ">=3.14" in pyproject.toml, so there is exactly
+        # one supported version today. Add "3.15" here when it ships.
+        python-version: ["3.14"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Installing the package (rather than importing from the source tree)
+      # is deliberate: it proves pyproject.toml is correct and that a user
+      # running `pip install` gets something that actually works.
+      - name: Install package and dev dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      # --cov-report=term-missing prints the uncovered line numbers straight
+      # into the log, so a coverage drop is actionable without downloading
+      # anything. --cov-fail-under makes coverage a gate rather than a
+      # metric: the suite currently sits at 98%, so 90 leaves room for an
+      # honest refactor while still blocking a real regression.
+      - name: Run tests
+        run: pytest --cov=og_optimizers --cov-report=term-missing --cov-fail-under=90

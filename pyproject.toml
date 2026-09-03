@@ -13,6 +13,12 @@ dependencies = ["numpy>=2.1.0", "scipy>=1.14.0", "matplotlib>=3.10.5"]
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "pytest-cov>=5.0.0", "ruff>=0.5.0", "mypy>=1.10.0"]
 
+# Be explicit about the src-layout rather than relying on setuptools'
+# auto-discovery. Auto-discovery fails silently when the layout is not
+# exactly what it expects, producing a wheel with metadata but no code.
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.ruff]
 line-length = 79 # PEP-8 recommends 79 characters for code and 72 for docstrings/comments
 target-version = "py314"
